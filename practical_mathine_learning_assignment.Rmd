@@ -1,0 +1,98 @@
+---
+title: "Predict particular activity base on accelerometers"
+author: "Anna"
+date: "2016年8月21日"
+output: html_document
+---
+
+
+## Overview
+
+Normally, people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. This report will research it, use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+## Prepare data
+
+```{r,  results='hide', include=FALSE, warning=FALSE}
+library(lattice)
+library(ggplot2)
+library(caret)
+library(randomForest)
+library(lars)
+library(gbm)
+
+
+setwd("~/programming/learning/DataScience/assignment/Practical_Machine_Learning/lesson4")
+
+```
+
+Read data form local files.
+
+```{r , echo=TRUE}
+testing <- read.csv("./data/pml-testing.csv")
+training <- read.csv("./data/pml-training.csv")
+dim(testing)
+dim(training)
+```
+
+## Clean data
+
+Remove the all NAs column in test and train data.
+
+```{r , echo=TRUE}
+isTestNAsCol <- sapply(testing, function (x) any(is.na(x) | toString(x) == ""))
+testNames <- names(isTestNAsCol)[!isTestNAsCol]
+# pick up  belt, forearm, arm, and dumbell 
+testNames <-  testNames[grepl("belt|arm|dumbbell|forearm", testNames)]
+trainNames <- c("classe", testNames)
+```
+
+Subset traing data to include testNames, and check the validity of the data
+
+```{r , echo=TRUE, results='hide'}
+trainClean <-  training[, trainNames]
+isTrainNAsCol <- sapply(trainClean, function (x) any(is.na(x) | toString(x) == ""))
+# the two length is 52, trainClean data is valid
+length(names(trainClean)[!isTrainNAsCol]) # 52
+length(names(trainClean)) # 52
+testClean <- testing[, testNames]
+dim(trainClean) #19622*52
+dim(testClean)  #20*52
+```
+
+
+## Split data
+
+```{r, echo=TRUE}
+set.seed(123)
+#create training set indexes with 70% of data
+inTrain <-createDataPartition(trainClean$classe, p=0.70, list=F)
+trainData <- trainClean[inTrain, ]
+testData <- trainClean[-inTrain, ]
+```
+
+
+## Modeling
+
+```{r, echo=TRUE, cache=TRUE}
+fitRf <- train(classe ~ ., data=trainData, method="rf", 
+                   trControl=trainControl(method = "cv",5), ntree=200)
+```
+
+
+Now, Obtain the accuracy on the test data.
+
+```{r, echo=TRUE}
+predictRf <- predict(fitRf, testData)
+confusionRes <- confusionMatrix(testData$classe, predictRf)
+accuracy <- confusionRes$overall[1]
+accuracy
+```
+
+Frome above result, the model's accuracy is 99.29%, and error ratio is less than %1.
+
+## Predict on the test data
+
+```{r, echo=TRUE}
+predictTest <- predict(fitRf, testClean)
+predictTest
+```
